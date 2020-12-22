@@ -1,0 +1,13 @@
+[package]
+name = "tuix_audio_synth"
+version = "0.1.0"
+authors = ["George Atkinson <geomyles@yahoo.co.uk>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cpal = "0.13.1"
+anyhow = "1.0.36"
+tuix = {git= "https://github.com/geom3trik/tuix", branch = "main"}
+crossbeam-channel = "0.5.0"
