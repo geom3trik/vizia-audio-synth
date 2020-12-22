@@ -1,6 +1,6 @@
 ![alt text](https://github.com/geom3trik/tuix_audio_synth/blob/main/screenshot.png?raw=true)
 
-In this tutorial we'll create a very simple audio synthesiser application from scratch. The finished code for this tutorial can be found at: https://github.com/geom3trik/tuix_audio_synth
+In this tutorial we'll create a very simple audio synthesiser application from scratch with a ui using tuix (https://github.com/geom3trik/tuix). The finished code for this tutorial can be found at: https://github.com/geom3trik/tuix_audio_synth
 
 (WARNING: Don't have your volume too loud when using headphones)
 
