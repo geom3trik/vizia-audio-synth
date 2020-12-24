@@ -149,6 +149,7 @@ First we'll define the messages that can be sent to the audio thread with an enu
 ```Rust
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Message {
+    Note(f32), 
     Frequency(f32),
     Amplitude(f32),
 }
@@ -192,7 +193,7 @@ impl EventHandler for Controller {
                 WindowEvent::KeyDown(key_input) => {
                     if let Some(virtual_keycode) = key_input {
                         if *virtual_keycode == VirtualKeyCode::Z {
-                            self.command_sender.send(Message::Amplitude(1.0)).unwrap();
+                            self.command_sender.send(Message::Note(1.0)).unwrap();
                         }
                     }
                 }
@@ -200,7 +201,7 @@ impl EventHandler for Controller {
                 WindowEvent::KeyUp(key_input) => {
                     if let Some(virtual_keycode) = key_input {
                         if *virtual_keycode == VirtualKeyCode::Z {
-                            self.command_sender.send(Message::Amplitude(0.0)).unwrap();
+                            self.command_sender.send(Message::Note(0.0)).unwrap();
                         }
                     }
                 }
@@ -214,7 +215,7 @@ impl EventHandler for Controller {
 }
 ```
 
-Here we use the `KeyDown` and `KeyUp` variants from `WindowEvent` and check if the input key is the Z key. Then we send an amplitude message using the command sender with `Amplitude(1.0)` when the Z key is pressed and `Amplitude(0.0)` when it is released.
+Here we use the `KeyDown` and `KeyUp` variants from `WindowEvent` and check if the input key is the Z key. Then we send a `Note` message using the command sender with `Note(1.0)` when the Z key is pressed and `Note(0.0)` when it is released.
 
 To use this new widget we'll need to add it to our application and build it. First, create a crossbeam_channel by adding this line to the start of the main function:
 
@@ -270,7 +271,7 @@ where
                 while let Ok(command) = command_receiver.try_recv() {
                     // println!("Received Message: {:?}", command);
                      match command {
-                        Message::Amplitude(val) => {
+                        Message::Note(val) => {
                             note = val;
                         }
                        
@@ -290,7 +291,7 @@ where
                 // This creates a 'phase clock' which varies between 0.0 and 1.0 with a rate of frequency
                 phi = (phi + (frequency / sample_rate)).fract();
 
-                let make_noise = |phi: f32| -> f32 {amplitude * (2.0 * 3.141592 * phi).sin()};
+                let make_noise = |phi: f32| -> f32 {note * amplitude * (2.0 * 3.141592 * phi).sin()};
                 
                 // Convert the make_noise output into a sample
                 let value: T = cpal::Sample::from::<f32>(&make_noise(phi));
@@ -315,7 +316,7 @@ where
 }
 ```
 
-The run function now takes an aditional crossbeam_channel parameter, and notice that we've also now multipllied the sine function inside of the make_noise closure by the note value. Make sure to pass the `command_sender` to the run function call inside our main, like so:
+The run function now takes an aditional crossbeam_channel parameter, and notice that we've also now multipllied the sine function inside of the make_noise closure by the note value. Make sure to pass the `command_receiver` to the run function call inside our main, like so:
 
 ```Rust
 ...
@@ -350,7 +351,7 @@ If we run this now the tone should play when we hit the Z key.
 
 # Step 6 - Adding control knobs
 
-Time to add some control's for the amplitude and frequency of our simple oscillator. First, add some entity id's to the Controller widget for the different knobs:
+Time to add some controls for the amplitude and frequency of our simple oscillator. First, add some entity ID's to the `Controller` widget for the different knobs:
 
 ```Rust
 ...
@@ -369,7 +370,7 @@ struct Controller {
 }
 ...
 ```
-For now we initalise them with `Entity::null()`. Next, add the following lines into the `on_build` function of the `BuildHandler` implimentation for our `Controller` widget.
+For now we initalise them with `Entity::null()`. Next, add the following lines into the `on_build` function of the `BuildHandler` implementation for our `Controller` widget.
 
 ```Rust
 ...
@@ -465,7 +466,6 @@ if let Some(slider_event) = event.message.downcast::<SliderEvent>() {
 ...
 ```
 
-And that's it! If we run our app now and press the Z key to play the tone we can now change the amplitude and frequency of the tone using the two control knobs while the tone is playing.
-
+And that's it! If we run our app now and press the Z key to play the tone we can now change the amplitude and frequency of the tone using the two control knobs, even while the tone is playing.
 
 
