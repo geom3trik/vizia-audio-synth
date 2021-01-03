@@ -3,7 +3,7 @@ knob {
 }
 
 knob>.back {
-    background-color: #505050;
+    background-color: #2e2e2e;
 }
 
 knob>.slider {
@@ -15,6 +15,7 @@ knob>.tick {
 }
 
 textbox {
+    color: white;
     background-color: #2e2e2e;
     padding-left: 5px;
 }
