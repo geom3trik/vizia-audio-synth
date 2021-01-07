@@ -1,6 +1,6 @@
 ![alt text](https://github.com/geom3trik/tuix_audio_synth/blob/main/screenshot.png?raw=true)
 
-In this tutorial we'll create a very simple audio synthesiser application from scratch with a ui using tuix (https://github.com/geom3trik/tuix). The finished code for this tutorial can be found at: https://github.com/geom3trik/tuix_audio_synth
+In this tutorial we'll create a very simple audio synthesiser application from scratch with a ui using [tuix](https://github.com/geom3trik/tuix). The finished code for this tutorial can be found at: https://github.com/geom3trik/tuix_audio_synth
 
 (WARNING: Don't have your volume too loud when using headphones)
 
@@ -8,7 +8,7 @@ In this tutorial we'll create a very simple audio synthesiser application from s
 
 Start by creating a new rust binary project:
 ```
-cargo new --bin audio_synth
+cargo new audio_synth
 ```
 
 In the generated `Cargo.toml` file inside the audio_synth directory, add the following dependencies:
@@ -17,7 +17,7 @@ In the generated `Cargo.toml` file inside the audio_synth directory, add the fol
 [dependencies]
 cpal = "0.13.1"
 anyhow = "1.0.36"
-tuix = {git= "https://github.com/geom3trik/tuix"}
+tuix = {git = "https://github.com/geom3trik/tuix", branch = "main"}
 crossbeam-channel = "0.5.0"
 ```
 
@@ -25,26 +25,24 @@ We'll be using cpal for the audio generation and crossbeam-channel for communica
 
 # Step 2 - Create a simple tuix application
 
-To start with we'll just create an empty window application using tuix with the following code in our `mian.rs` file: 
+To start with we'll just create an empty window application using tuix with the following code in our `main.rs` file: 
 
 ```Rust
-extern crate tuix;
-extern crate cpal;
+use tuix::{
+    Application, BuildHandler, Entity, Event, EventHandler, MouseButtonState, SliderEvent, State,
+    VirtualKeyCode, WindowEvent,
+};
 
-use tuix::{Application, BuildHandler, EventHandler, State, Entity, Event, WindowEvent, MouseButtonState, VirtualKeyCode, SliderEvent};
-
+use tuix::style::{AlignItems, JustifyContent, Length};
 use tuix::widgets::{HBox, ValueKnob};
-use tuix::style::{JustifyContent, AlignItems, Length};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 use std::thread;
 
 fn main() {
-    let app = Application::new(|win_desc, state, window|{
-        
+    let app = Application::new(|win_desc, state, window| {
         win_desc.with_title("Audio Synth").with_inner_size(200, 120)
-    
     });
 
     app.run();
@@ -72,15 +70,15 @@ thread::spawn(move || {
 
     match config.sample_format() {
         cpal::SampleFormat::F32 => {
-            run::<f32>(&device, &config.into(), command_receiver.clone()).unwrap();
+            run::<f32>(&device, &config.into()).unwrap();
         }
 
         cpal::SampleFormat::I16 => {
-            run::<i16>(&device, &config.into(), command_receiver.clone()).unwrap();
+            run::<i16>(&device, &config.into()).unwrap();
         }
             
         cpal::SampleFormat::U16 => {
-            run::<u16>(&device, &config.into(), command_receiver.clone()).unwrap();
+            run::<u16>(&device, &config.into()).unwrap();
         }    
     }
 });
@@ -368,6 +366,16 @@ struct Controller {
     amplitude_knob: Entity,
     frequency_knob: Entity,
 }
+
+impl Controller {
+    pub fn new(command_sender: crossbeam_channel::Sender<Message>) -> Self {
+        Controller {
+            command_sender,
+            amplitude_knob: Entity::null(),
+            frequency_knob: Entity::null(),
+        }
+    }
+}
 ...
 ```
 For now we initalise them with `Entity::null()`. Next, add the following lines into the `on_build` function of the `BuildHandler` implementation for our `Controller` widget.
@@ -450,7 +458,7 @@ Now that we have some control knob widgets for amplitude and frequency, we need 
 if let Some(slider_event) = event.message.downcast::<SliderEvent>() {
     match slider_event {
         
-        SliderEvent::ValueChanged(_, val) => {
+        SliderEvent::ValueChanged(val) => {
             if event.target == self.amplitude_knob {
                 self.command_sender.send(Message::Amplitude(*val)).unwrap();
             }
