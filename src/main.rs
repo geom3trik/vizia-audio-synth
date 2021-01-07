@@ -93,7 +93,7 @@ impl EventHandler for Controller {
         if let Some(slider_event) = event.message.downcast::<SliderEvent>() {
             match slider_event {
                 
-                SliderEvent::ValueChanged(_, val) => {
+                SliderEvent::ValueChanged(val) => {
                     
                     if event.target == self.amplitude_knob {
                         self.command_sender.send(Message::Amplitude(*val)).unwrap();
