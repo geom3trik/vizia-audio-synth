@@ -14,6 +14,7 @@ use std::thread;
 static THEME: &'static str = include_str!("theme.css");
 
 
+// Messages to pass between gui and audio threads
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Message {
     Frequency(f32),
@@ -21,6 +22,7 @@ pub enum Message {
     Note(f32),
 }
 
+// A controller widget which holds the knobs and the message channel
 struct Controller {
     command_sender: crossbeam_channel::Sender<Message>,
 
@@ -39,6 +41,7 @@ impl Controller {
     }
 }
 
+// Build the controller widget with two knobs. One for amplituide and one for frequency.
 impl BuildHandler for Controller {
     type Ret = Entity;
     fn on_build(&mut self, state: &mut State, entity: Entity) -> Self::Ret {
@@ -65,6 +68,7 @@ impl BuildHandler for Controller {
     }
 }
 
+// Handle keyboard events to trigger a note when Z is pressed. Also handle slider events from the knobs to send messages to audio thread.
 impl EventHandler for Controller {
     fn on_event(&mut self, state: &mut State, entity: Entity, event: &mut Event) -> bool {
 
@@ -115,8 +119,10 @@ impl EventHandler for Controller {
 
 fn main() {
 
+    // Create a channel for sending messages between threads
     let (command_sender, command_receiver) = crossbeam_channel::bounded(1024);
 
+    // Move audio playback into another thread
     thread::spawn(move || {
 
         let host = cpal::default_host();
@@ -143,7 +149,7 @@ fn main() {
     });
 
 
-
+    // Create a gui application on the main thread
     let app = Application::new(|win_desc, state, window|{
         
         state.style.parse_theme(THEME);
@@ -156,8 +162,6 @@ fn main() {
 
     app.run();
 }
-
-
 
 
 fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig, command_receiver: crossbeam_channel::Receiver<Message>) -> Result<(), anyhow::Error>
@@ -181,11 +185,12 @@ where
     let stream = device.build_output_stream(
         config,
         move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
+            // A frame is a buffer of samples for all channels. So for 2 channels it's 2 samples.
             for frame in data.chunks_mut(channels) {
 
-                while let Ok(command) = command_receiver.try_recv() {
-                    // println!("Received Message: {:?}", command);
-                     match command {
+                // Try to receive a message from the gui thread
+                while let Ok(command) = command_receiver.try_recv() { 
+                    match command {
 
                         Message::Note(val) => {
                             note = val;
@@ -198,20 +203,19 @@ where
                         Message::Frequency(val) => {
                             frequency = val;
                         }
- 
-                         _=> {}
-                     }
-                     
-                 }
+                    }
+                }
                 
                 // This creates a 'phase clock' which varies between 0.0 and 1.0 with a rate of frequency
                 phi = (phi + (frequency / sample_rate)).fract();
 
+                // Generate a sine wave signal
                 let make_noise = |phi: f32| -> f32 {amplitude * note * (2.0f32 * 3.141592f32 * phi).sin()};
                 
                 // Convert the make_noise output into a sample
                 let value: T = cpal::Sample::from::<f32>(&make_noise(phi));
-                
+                 
+                // Assign this sample to all channels in the frame
                 for sample in frame.iter_mut() {
                     *sample = value;
                 }
