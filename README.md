@@ -28,13 +28,7 @@ We'll be using cpal for the audio generation and crossbeam-channel for communica
 To start with we'll just create an empty window application using tuix with the following code in our `main.rs` file: 
 
 ```Rust
-use tuix::{
-    Application, BuildHandler, Entity, Event, EventHandler, MouseButtonState, SliderEvent, State,
-    VirtualKeyCode, WindowEvent,
-};
-
-use tuix::style::{AlignItems, JustifyContent, Length};
-use tuix::widgets::{HBox, ValueKnob};
+use tuix::*;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
