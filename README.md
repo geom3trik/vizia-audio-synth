@@ -188,19 +188,15 @@ impl EventHandler for Controller {
 
         if let Some(window_event) = event.message.downcast::<WindowEvent>() {
             match window_event {
-                WindowEvent::KeyDown(key_input) => {
-                    if let Some(virtual_keycode) = key_input {
-                        if *virtual_keycode == VirtualKeyCode::Z {
-                            self.command_sender.send(Message::Note(1.0)).unwrap();
-                        }
+                WindowEvent::KeyDown(code, _) => {
+                    if *code == Code::KeyZ {
+                        self.command_sender.send(Message::Note(1.0)).unwrap();
                     }
                 }
 
-                WindowEvent::KeyUp(key_input) => {
-                    if let Some(virtual_keycode) = key_input {
-                        if *virtual_keycode == VirtualKeyCode::Z {
-                            self.command_sender.send(Message::Note(0.0)).unwrap();
-                        }
+                WindowEvent::KeyUp(code, _) => {
+                    if *code == Code::KeyZ {
+                        self.command_sender.send(Message::Note(0.0)).unwrap();
                     }
                 }
 
