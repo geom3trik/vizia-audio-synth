@@ -178,7 +178,7 @@ impl BuildHandler for Controller {
 }
 
 impl EventHandler for Controller {
-    fn on_event(&mut self, state: &mut State, entity: Entity, event: &mut Event) -> bool {
+    fn on_event(&mut self, state: &mut State, entity: Entity, event: &mut Event) {
 
         if let Some(window_event) = event.message.downcast::<WindowEvent>() {
             match window_event {
@@ -197,8 +197,6 @@ impl EventHandler for Controller {
                 _=> {}
             }
         }
-
-        false
     }
 }
 ```
