@@ -65,7 +65,7 @@ impl BuildHandler for Controller {
 
 // Handle keyboard events to trigger a note when Z is pressed. Also handle slider events from the knobs to send messages to audio thread.
 impl EventHandler for Controller {
-    fn on_event(&mut self, state: &mut State, entity: Entity, event: &mut Event) -> bool {
+    fn on_event(&mut self, state: &mut State, entity: Entity, event: &mut Event) {
 
         if let Some(window_event) = event.message.downcast::<WindowEvent>() {
             match window_event {
@@ -103,8 +103,6 @@ impl EventHandler for Controller {
                 _=> {}
             }
         }
-
-        false
     }
 }
 
