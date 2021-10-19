@@ -1,6 +1,7 @@
 
 
 use tuix::*;
+use tuix::widgets::*;
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
@@ -37,22 +38,29 @@ impl Controller {
 }
 
 // Build the controller widget with two knobs. One for amplituide and one for frequency.
-impl BuildHandler for Controller {
+impl Widget for Controller {
     type Ret = Entity;
+    type Data = ();
     fn on_build(&mut self, state: &mut State, entity: Entity) -> Self::Ret {
 
-        let row = HBox::new().build(state, entity, |builder| {
-            builder.set_justify_content(JustifyContent::SpaceEvenly)
+        let row = Row::new().build(state, entity, |builder| {
+            builder
+                .set_child_space(Stretch(1.0))
+                .set_col_between(Stretch(1.0))
         });
 
-        self.amplitude_knob = ValueKnob::new("Amplitude", 1.0, 0.0, 1.0).build(state, row, |builder|
+        let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::One, None);
+
+        self.amplitude_knob = Knob::new(map, 1.0).build(state, row, |builder|
             builder
-                .set_width(Length::Pixels(50.0))
+                .set_width(Pixels(50.0))
         );
 
-        self.frequency_knob = ValueKnob::new("Frequency", 440.0, 0.0, 2000.0).build(state, row, |builder|
+        let map = FrequencyMap::new(440.0, 2000.0, ValueScaling::Linear, FrequencyDisplayMode::default(), true);
+
+        self.frequency_knob = Knob::new(map, 0.0).build(state, row, |builder|
             builder
-                .set_width(Length::Pixels(50.0))
+                .set_width(Pixels(50.0))
         );
 
 
@@ -61,10 +69,7 @@ impl BuildHandler for Controller {
 
         entity
     }
-}
-
-// Handle keyboard events to trigger a note when Z is pressed. Also handle slider events from the knobs to send messages to audio thread.
-impl EventHandler for Controller {
+    // Handle keyboard events to trigger a note when Z is pressed. Also handle slider events from the knobs to send messages to audio thread.
     fn on_event(&mut self, state: &mut State, entity: Entity, event: &mut Event) {
 
         if let Some(window_event) = event.message.downcast::<WindowEvent>() {
@@ -139,13 +144,14 @@ fn main() {
 
 
     // Create a gui application on the main thread
-    let app = Application::new(|win_desc, state, window|{
+    let window_description = WindowDescription::new().with_title("Audio Synth").with_inner_size(200, 120);
+    let app = Application::new(window_description, |state, window|{
         
         state.style.parse_theme(THEME);
 
-        Controller::new(command_sender.clone()).build(state, window, |builder| builder);
+        window.set_background_color(state, Color::rgb(60, 60, 60));
 
-        win_desc.with_title("Audio Synth").with_inner_size(200, 120)
+        Controller::new(command_sender.clone()).build(state, window, |builder| builder);
     
     });
 
@@ -190,7 +196,7 @@ where
                         }
  
                         Message::Frequency(val) => {
-                            frequency = val;
+                            frequency = (val * (2000.0 - 440.0)) + 440.0;
                         }
                     }
                 }
