@@ -1,24 +1,31 @@
-knob {
-    width: 50px;
-    height: 50px;
+
+.content {
     background-color: #262a2d;
-    border-radius: 38px;
-    border-width: 2px;
-    border-color: #363636;
+    child-space: 1s;
+    col-between: 1s;
 }
 
-knob>.value_track {
-    background-color: #4f4f4f;
-    radius: 30px;
-    span: 5px;
+.control {
+    width: auto;
+    height: auto;
+    child-space: 1s;
+    row-between: 8px;
 }
 
-knob>.value_track>.active {
+knob {
+    width: 76px;
+    height: 76px;
+    background-color: #262a2d;
+    border-radius: 50%;
+}
+
+knob .track {
     background-color: #ffb74d;
 }
 
-textbox {
+label {
     color: white;
-    background-color: #2e2e2e;
-    padding-left: 5px;
+    width: 100px;
+    height: 24px;
+    child-space: 1s;
 }
