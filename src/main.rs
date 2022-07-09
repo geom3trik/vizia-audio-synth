@@ -1,14 +1,7 @@
-
-
-use tuix::*;
-use tuix::widgets::*;
-
+use vizia::prelude::*;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use std::thread;
-
 static THEME: &'static str = include_str!("theme.css");
-
 
 // Messages to pass between gui and audio threads
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -19,94 +12,53 @@ pub enum Message {
 }
 
 // A controller widget which holds the knobs and the message channel
-struct Controller {
+#[derive(Lens)]
+struct AppData {
     command_sender: crossbeam_channel::Sender<Message>,
-
-    amplitude_knob: Entity,
-    frequency_knob: Entity,
+    amplitude: f32,
+    frequency: f32,
 }
 
-impl Controller {
-    pub fn new(command_sender: crossbeam_channel::Sender<Message>) -> Self {
-        Controller {
-            command_sender,
-
-            amplitude_knob: Entity::null(),
-            frequency_knob: Entity::null(),
-        }
-    }
+pub enum AppEvent {
+    SetAmplitude(f32),
+    SetFrequency(f32),
 }
 
-// Build the controller widget with two knobs. One for amplituide and one for frequency.
-impl Widget for Controller {
-    type Ret = Entity;
-    type Data = ();
-    fn on_build(&mut self, state: &mut State, entity: Entity) -> Self::Ret {
+impl Model for AppData {
+    fn event(&mut self, _: &mut Context, event: &mut Event) {
+        event.map(|app_event, _| match app_event {
+            AppEvent::SetAmplitude(amp) => {
+                self.amplitude = *amp;
+                self.command_sender.send(Message::Amplitude(self.amplitude)).unwrap();
+            }
 
-        let row = Row::new().build(state, entity, |builder| {
-            builder
-                .set_child_space(Stretch(1.0))
-                .set_col_between(Stretch(1.0))
+            AppEvent::SetFrequency(freq) => {
+                self.frequency = *freq;
+                self.command_sender.send(Message::Frequency(self.frequency)).unwrap();
+            }
         });
 
-        let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::One, None);
+        event.map(|window_event, _| match window_event {
+            WindowEvent::KeyDown(code, _) if *code == Code::KeyZ => {
+                self.command_sender.send(Message::Note(1.0)).unwrap();
+            }
 
-        self.amplitude_knob = Knob::new(map, 1.0).build(state, row, |builder|
-            builder
-                .set_width(Pixels(50.0))
-        );
+            WindowEvent::KeyUp(code, _) if *code == Code::KeyZ => {
+                self.command_sender.send(Message::Note(0.0)).unwrap();
+            }
 
-        let map = FrequencyMap::new(440.0, 2000.0, ValueScaling::Linear, FrequencyDisplayMode::default(), true);
-
-        self.frequency_knob = Knob::new(map, 0.0).build(state, row, |builder|
-            builder
-                .set_width(Pixels(50.0))
-        );
-
-
-
-        state.focused = entity;
-
-        entity
+            _=> {}
+        })
     }
-    // Handle keyboard events to trigger a note when Z is pressed. Also handle slider events from the knobs to send messages to audio thread.
-    fn on_event(&mut self, state: &mut State, entity: Entity, event: &mut Event) {
+}
 
-        if let Some(window_event) = event.message.downcast::<WindowEvent>() {
-            match window_event {
-                WindowEvent::KeyDown(code, _) => {
-                    if *code == Code::KeyZ {
-                        self.command_sender.send(Message::Note(1.0)).unwrap();
-                    }
-                }
+impl AppData {
+    pub fn new(command_sender: crossbeam_channel::Sender<Message>) -> Self {
+        Self {
+            command_sender,
 
-                WindowEvent::KeyUp(code, _) => {
-                    if *code == Code::KeyZ {
-                        self.command_sender.send(Message::Note(0.0)).unwrap();
-                    }
-                }
-
-                _=> {}
-            }
-        }
-
-        if let Some(slider_event) = event.message.downcast::<SliderEvent>() {
-            match slider_event {
-                
-                SliderEvent::ValueChanged(val) => {
-                    
-                    if event.target == self.amplitude_knob {
-                        self.command_sender.send(Message::Amplitude(*val)).unwrap();
-                    }
-
-                    if event.target == self.frequency_knob {
-                        self.command_sender.send(Message::Frequency(*val)).unwrap();
-                    }
-                    
-                }
-
-                _=> {}
-            }
+            amplitude: 0.5,
+            frequency: 0.0,
         }
     }
 }
@@ -117,7 +69,7 @@ fn main() {
     let (command_sender, command_receiver) = crossbeam_channel::bounded(1024);
 
     // Move audio playback into another thread
-    thread::spawn(move || {
+    std::thread::spawn(move || {
 
         let host = cpal::default_host();
     
@@ -142,28 +94,38 @@ fn main() {
         }
     });
 
+    Application::new(move |cx|{
 
-    // Create a gui application on the main thread
-    let window_description = WindowDescription::new().with_title("Audio Synth").with_inner_size(200, 120);
-    let app = Application::new(window_description, |state, window|{
-        
-        state.style.parse_theme(THEME);
+        cx.add_theme(THEME);
 
-        window.set_background_color(state, Color::rgb(60, 60, 60));
+        AppData::new(command_sender.clone()).build(cx);
 
-        Controller::new(command_sender.clone()).build(state, window, |builder| builder);
-    
-    });
+        HStack::new(cx, |cx|{
+            VStack::new(cx, |cx|{
+                Knob::new(cx, 0.5, AppData::amplitude, false)
+                    .on_changing(|cx, val| cx.emit(AppEvent::SetAmplitude(val)));
+                Label::new(cx, AppData::amplitude.map(|amp| format!("{:.2}", amp)));
+            })
+            .class("control");
 
-    app.run();
+            VStack::new(cx, |cx|{
+                Knob::new(cx, 0.0, AppData::frequency, false)
+                    .on_changing(|cx, val| cx.emit(AppEvent::SetFrequency(val)));
+                Label::new(cx, AppData::frequency.map(|freq| format!("{:.0} Hz", 440.0 + *freq * (2000.0 - 440.0))));
+            })
+            .class("control");
+        })
+        .class("content");
+    })
+    .title("Audio Synth")
+    .inner_size((200, 120))
+    .run();
 }
-
 
 fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig, command_receiver: crossbeam_channel::Receiver<Message>) -> Result<(), anyhow::Error>
 where
     T: cpal::Sample,
 {
-
     // Get the sample rate and channels number from the config
     let sample_rate = config.sample_rate.0 as f32;
     let channels = config.channels as usize;

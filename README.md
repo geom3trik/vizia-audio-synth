@@ -1,6 +1,6 @@
 ![alt text](https://github.com/geom3trik/tuix_audio_synth/blob/main/screenshot.png?raw=true)
 
-In this tutorial we'll create a very simple audio synthesiser application from scratch with a ui using [tuix](https://github.com/geom3trik/tuix). The finished code for this tutorial can be found at: https://github.com/geom3trik/tuix_audio_synth
+In this tutorial we'll create a very simple audio synthesizer application from scratch with a GUI using [Vizia](https://github.com/vizia/vizia).
 
 (WARNING: Don't have your volume too loud when using headphones)
 
@@ -13,49 +13,45 @@ cargo new audio_synth
 
 In the generated `Cargo.toml` file inside the audio_synth directory, add the following dependencies:
 
-```
+```toml
 [dependencies]
-cpal = "0.13.1"
-anyhow = "1.0.36"
-tuix = {git = "https://github.com/geom3trik/tuix", branch = "main"}
-crossbeam-channel = "0.5.0"
+cpal = "0.13.5"
+anyhow = "1.0.58"
+vizia = {git = "https://github.com/geom3trik/vizia"}
+crossbeam-channel = "0.5.5"
 ```
 
-We'll be using cpal for the audio generation and crossbeam-channel for communicating between our main thread and the audio thread that we'll be creating.
+We'll be using cpal for the audio generation and crossbeam-channel for communicating between our main thread and the audio thread which CPAL creates for us.
 
-# Step 2 - Create a simple tuix application
+# Step 2 - Create a simple vizia application
 
-To start with we'll just create an empty window application using tuix with the following code in our `main.rs` file: 
+To start with we'll just create an empty window application using vizia with the following code in our `main.rs` file: 
 
 ```Rust
-use tuix::*;
-use tuix::widgets::*;
-
+use vizia::prelude::*;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use std::thread;
-
 fn main() {
-    let window_description = WindowDescription::new().with_title("Audio Synth").with_inner_size(200, 120);
 
-    let app = Application::new(window_description, |state, window| {
-        
-    });
-
-    app.run();
+    Application::new(|cx|{
+        // UI will go here
+    })
+    .title("Audio Synth")
+    .inner_size((200, 120))
+    .run();
 }
 ```
 
-To save some time the things we'll need from tuix and cpal have also been included at the top of the file.
+To save some time the things we'll need from vizia and cpal have also been included at the top of the file.
 
 # Step 3 - Generating some sound
 
-Before we populate our window with widgets, let's first write the code that will generate some sound.
+Before we populate our window with views, let's first write the code that will generate some sound.
 
 First we'll start a new thread for the audio generation, get the default host and output device from cpal, and then call a `run` function that will generate the audio, which we'll write next. Add the following code to the beginning of our main function:
 
 ```Rust
-thread::spawn(move || {
+std::thread::spawn(move || {
 
     let host = cpal::default_host();
 
@@ -80,9 +76,10 @@ thread::spawn(move || {
     }
 });
 ```
+
 Because we don't know what sample format the default output config will give to us, we need to match on the sample format and make our `run` function generic over the sample type.
 
-Now we'll write that `run` function which will build an output stream and play the audio. Add this code below our main function in the main.rs file:
+Now we'll write that `run` function which will build an output stream and play the audio. Add this code below our main function in the `main.rs` file:
 
 ```Rust
 fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig) -> Result<(), anyhow::Error>
@@ -99,8 +96,8 @@ where
     // Define some variables we need for a simple oscillator
     let mut phi = 0.0f32;
     let mut frequency = 440.0;
-    let mut amplitude = 1.0;
-    let mut note = 0.0;
+    let mut amplitude = 0.1;
+    let mut note = 1.0;
     
     // Build an output stream
     let stream = device.build_output_stream(
@@ -133,14 +130,16 @@ where
     Ok(())
 }
 ```
+
 Inside our run function are values for note, which is either 0.0 for off or 1.0 for on, amplitude, which varies between 0.0 and 1.0, and frequency, which we've set initially to 440.0 Hz.
 
 If we run our app now with `cargo run`, a window should appear and you should hear a tone played continuously until we close the window.
 
-# Step 4 - Creating the controller widget
-Preferably we would like the tone to only play when a key is pressed. To do this we're going to create a new custom widget that will be in charge of receiving keyboard events, as well as events from other widgets, and to generate and send messages from the main thread to the audio thread to control our oscillator.
+# Step 4 - Setting up communication
 
-First we'll define the messages that can be sent to the audio thread with an enum:
+To be able to change the note, amplitude, and frequency of the tone from the UI thread, we need to set up some inter-thread communication.
+
+First we'll define the messages that can be sent to the audio thread with an enum. Add the following above the main function:
 ```Rust
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Message {
@@ -150,86 +149,99 @@ pub enum Message {
 }
 ```
 
-Then we'll define a new custom widget struct and it's implementation like so:
-
-```Rust
-struct Controller {
-    command_sender: crossbeam_channel::Sender<Message>,
-}
-
-impl Controller {
-    pub fn new(command_sender: crossbeam_channel::Sender<Message>) -> Self {
-        Controller {
-            command_sender,
-        }
-    }
-}
-```
-The `Controller` widget contains a crossbeam_channel which we'll use to send messages to the audio thread.
-
-Next we'll implement the `Widget` trait for the `Controller`. In the `on_build` function for the implementation, we'll set the focused widget to this one so that keyboard events are sent to our Controller. We'll put our logic for sending a `Note` message when the `Z` key is pressed in the event handler `on_event` method, as shown below:
-
-```Rust
-impl Widget for Controller {
-    type Ret = Entity;
-    type Data = ();
-
-    fn on_build(&mut self, state: &mut State, entity: Entity) -> Self::Ret {
-
-        state.focused = entity;
-
-        entity
-    }
-
-    fn on_event(&mut self, state: &mut State, entity: Entity, event: &mut Event) {
-
-        if let Some(window_event) = event.message.downcast::<WindowEvent>() {
-            match window_event {
-                WindowEvent::KeyDown(code, _) => {
-                    if *code == Code::KeyZ {
-                        self.command_sender.send(Message::Note(1.0)).unwrap();
-                    }
-                }
-
-                WindowEvent::KeyUp(code, _) => {
-                    if *code == Code::KeyZ {
-                        self.command_sender.send(Message::Note(0.0)).unwrap();
-                    }
-                }
-
-                _=> {}
-            }
-        }
-    }
-}
-```
-
-Here we use the `KeyDown` and `KeyUp` variants from `WindowEvent` and check if the input key is the Z key. Then we send a `Note` message using the command sender with `Note(1.0)` when the Z key is pressed and `Note(0.0)` when it is released.
-
-To use this new widget we'll need to add it to our application and build it. First, create a crossbeam_channel by adding this line to the start of the main function:
+Next, we'll create a crossbeam channel which we can use to send these messages from a sender to a receiver. Add the following to the top of the main function before creating the application:
 
 ```Rust
 let (command_sender, command_receiver) = crossbeam_channel::bounded(1024);
 ```
 
-Then, change the code inside of `Application::new(...)` so it looks like this:
+# Step 5- Creating the UI model
+
+Before we can add some views to control the synth parameters, we need some data which the views will bind to. Vizia is a reactive framework, which means that the UI will update in response to changes in data.
+
+Define a new struct and it's implementation like so:
 
 ```Rust
-...
-let app = Application::new(window_description, |state, window|{
-        
+#[derive(Lens)]
+struct AppData {
+    command_sender: crossbeam_channel::Sender<Message>,
+    amplitude: f32,
+    frequency: f32,
+}
 
-    Controller::new(command_sender.clone()).build(state, window, |builder| builder);
-    
-});
-...
+impl AppData {
+    pub fn new(command_sender: crossbeam_channel::Sender<Message>) -> Self {
+        Self {
+            command_sender,
+            amplitude: 0.1,
+            frequency: 0.0,
+        }
+    }
+}
 ```
 
-If we run our app again now with `cargo run` nothing will have changed. This is because although we are sending messages, our audio thread isn't set up to receive them yet.
+
+The `AppData` contains a crossbeam_channel sender which we'll use to send messages to the audio thread. Note also the `#[derive(Lens)]`. This is used by Vizia to bind views to pieces of data from our model.
+
+Next we'll implement the `Model` trait for the `AppData`. This trait provides an `event` function which we can use to update the model data in response to events sent from views in our UI. For this we'll also need an enum which represents these UI events. Add the following above the main function:
+
+```rust
+pub enum AppEvent {
+    SetAmplitude(f32),
+    SetFrequency(f32),
+}
+
+impl Model for AppData {
+    fn event(&mut self, cx: &mut Context, event: &mut Event) {
+        // Respond to app events
+        event.map(|app_event, _| match app_event {
+            AppEvent::SetAmplitude(amp) => {
+                self.amplitude = *amp;
+                self.command_sender.send(Message::Amplitude(self.amplitude)).unwrap();
+            }
+
+            AppEvent::SetFrequency(freq) => {
+                self.frequency = *freq;
+                self.command_sender.send(Message::Frequency(self.frequency)).unwrap();
+            }
+        });
+
+        // Respond to window events
+        event.map(|window_event, _| match window_event {
+            WindowEvent::KeyDown(code, _) if *code == Code::KeyZ => {
+                self.command_sender.send(Message::Note(1.0)).unwrap();
+            }
+
+            WindowEvent::KeyUp(code, _) if *code == Code::KeyZ => {
+                self.command_sender.send(Message::Note(0.0)).unwrap();
+            }
+
+            _=> {}
+        })
+    }
+}
+```
+
+Within the `event` function of the `Model` trait we handle two different kinds of event. In the first case we handle our application events, setting the internal model state and also sending a message to the audio thread. In the second case we handle window events.
+
+Here we use the `KeyDown` and `KeyUp` variants from `WindowEvent` and check if the input key is the Z key. Then we send a `Note` message using the command sender with `Note(1.0)` when the Z key is pressed and `Note(0.0)` when it is released.
+
+To use this model we'll need to add it to our application and build it. Change the code inside of `Application::new(...)` so it looks like this:
+
+```Rust
+Application::new(move |cx|{
+    AppData::new(command_sender.clone()).build(cx);
+})
+.inner_size((200, 120))
+.run();
+
+```
+
+If we run our app again now with `cargo run` nothing will have changed. This is because although we are sending messages when the `Z` key is pressed, our audio thread isn't set up to receive them yet.
 
 # Step 5 - Reacting to messages
 
-Now that messages are being sent by our `Controller`, we need to modify the code in our `run` function to receive these events and change our oscillator note value. Modify the `run` function to look like the following:
+Now that messages are being sent by our model, we need to modify the code in our `run` function to receive these events and change our oscillator note value. Modify the `run` function to look like the following:
 
 ```Rust
 fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig, command_receiver: crossbeam_channel::Receiver<Message>) -> Result<(), anyhow::Error>
@@ -303,7 +315,13 @@ where
 }
 ```
 
-The run function now takes an aditional crossbeam_channel parameter, and notice that we've also now multipllied the sine function inside of the make_noise closure by the note value. Make sure to pass the `command_receiver` to the run function call inside our main, like so:
+Note that the value received from the `Frequency` message is a normalized value, which is why we need to convert the frequency in the `run()` function with the following code:
+
+```rs
+frequency = (val * (2000.0 - 440.0)) + 440.0;
+```
+
+The run function now takes an additional crossbeam_channel receiver parameter, and notice that we've also now multiplied the sine function inside of the `make_noise` closure by the note value. Make sure to pass the `command_receiver` to the run function call inside our main function like so:
 
 ```Rust
 ...
@@ -338,96 +356,51 @@ If we run this now the tone should play when we hit the Z key.
 
 # Step 6 - Adding control knobs
 
-Time to add some controls for the amplitude and frequency of our simple oscillator. First, add some entity IDs to the `Controller` widget for the different knobs:
+Time to add some controls for the amplitude and frequency of our simple oscillator. Inside the application closure, add the following code:
 
-```Rust
-...
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Message {
-    Frequency(f32),
-    Amplitude(f32),
-    Note(f32),
-}
+```rust
+Application::new(move |cx|{
+    AppData::new(command_sender.clone()).build(cx);
 
-struct Controller {
-    command_sender: crossbeam_channel::Sender<Message>,
+    // A row of knobs
+    HStack::new(cx, |cx|{
 
-    amplitude_knob: Entity,
-    frequency_knob: Entity,
-}
+        Knob::new(cx, 0.5, AppData::amplitude, false)
+            .on_changing(|cx, val| cx.emit(AppEvent::SetAmplitude(val)));
 
-impl Controller {
-    pub fn new(command_sender: crossbeam_channel::Sender<Message>) -> Self {
-        Controller {
-            command_sender,
-            amplitude_knob: Entity::null(),
-            frequency_knob: Entity::null(),
-        }
-    }
-}
-...
+        
+        Knob::new(cx, 0.0, AppData::frequency, false)
+            .on_changing(|cx, val| cx.emit(AppEvent::SetFrequency(val)));
+    })
+    .class("content");
+})
+.inner_size((200, 120))
+.run();
+
 ```
-For now we initalise them with `Entity::null()`. Next, add the following lines into the `on_build` function of the `Widget` implementation for our `Controller` widget.
+Let's break this down. The `HStack` is a container view which arranges its children into a row. To add children to the `HStack`, we simply declare them inside the closure. The `Knob` view takes three parameters after `cx`, an initial normalized value, a lens to the model data, and a boolean which determines whether the knob starts from the beginning or the center.
 
-```Rust
-...
-impl Widget for Controller {
-    type Ret = Entity;
-    type Data = ();
+The `#[derive(Lens)]` on our `AppData` allows us to pass a lens to a piece of our model with the convenient syntax `AppData::amplitude`. Now, if another view or event were to change the value of `amplitude` in our `AppData`, the knob would update to show the changed value.
 
-    fn on_build(&mut self, state: &mut State, entity: Entity) -> Self::Ret {
-
-        let row = Row::new().build(state, entity, |builder| {
-            builder
-                .set_child_space(Stretch(1.0))
-                .set_col_between(Stretch(1.0))
-        });
-
-        let map = GenericMap::new(0.0, 1.0, ValueScaling::Linear, DisplayDecimals::One, None);
-
-        self.amplitude_knob = Knob::new(map, 1.0).build(state, row, |builder|
-            builder
-                .set_width(Pixels(50.0))
-        );
-
-        let map = FrequencyMap::new(440.0, 2000.0, ValueScaling::Linear, FrequencyDisplayMode::default(), true);
-
-        self.frequency_knob = Knob::new(map, 0.0).build(state, row, |builder|
-            builder
-                .set_width(Pixels(50.0))
-        );
-
-
-
-        state.focused = entity;
-
-        entity
-    }
-}
-...
-```
-
-The `Knob` widget takes as input a map and a normalized value. For the amplitude knob we use a `GenericMap` which varies from 0.0 to 1.0 and set the default to 1.0. For the frequency knob we use a `FrequencyMap` which varies from 440.0 Hz to 2 KHz. We've also added a `Row` widget to space our controls out evenly.
+To update the values in the model the knobs have an `on_changing` callback which emit the appropriate `AppEvent`. This event propagates up the UI tree to the model where it is handled.
 
 Before we can run this and see our controls, we need to style them. Create a new file called `theme.css` in the src directory of this project. Then, add the following lines to this css file:
 
 ```CSS
-knob {
-    width: 50px;
-    height: 50px;
+.content {
     background-color: #262a2d;
-    border-radius: 38px;
-    border-width: 2px;
-    border-color: #363636;
+    child-space: 1s;
+    col-between: 1s;
 }
 
-knob>.value_track {
-    background-color: #4f4f4f;
-    radius: 30px;
-    span: 5px;
+knob {
+    width: 76px;
+    height: 76px;
+    background-color: #262a2d;
+    border-radius: 50%;
 }
 
-knob>.value_track>.active {
+knob .track {
     background-color: #ffb74d;
 }
 ```
@@ -438,46 +411,13 @@ Then add this line somewhere at the top of the main.rs file:
 static THEME: &'static str = include_str!("theme.css");
 ```
 
-And add this line inside the `Application::new()` closure, before the call to `Controller::new()`:
+And add this line inside the `Application::new()` closure, before the call to `AppData::new()`:
 
 ```Rust
-state.style.parse_theme(THEME);
-```
-
-Running the app now should show a a pair of knobs, one for amplitude and the other for frequency.
-
-NOTE: The knob widget in tuix is incomplete, and while they do function, not all style elements are in place such as the tick mark.
-
-# Step 7 - Connecting the control knobs
-
-Now that we have some knob widgets for amplitude and frequency, we need to send some messages to the audio thread when the values of the knobs change. When a knob is used a `SliderEvent::ValueChanged` event is sent up the hierarchy from the knob to the root (window). We can intercept this event in our `Controller` widget by adding the following code to the `on_event` function in the `Widget` implementation. 
-
-```Rust
-...
-if let Some(slider_event) = event.message.downcast::<SliderEvent>() {
-    match slider_event {
-        
-        SliderEvent::ValueChanged(val) => {
-            if event.target == self.amplitude_knob {
-                self.command_sender.send(Message::Amplitude(*val)).unwrap();
-            }
-
-            if event.target == self.frequency_knob {
-                self.command_sender.send(Message::Frequency(*val)).unwrap();
-            }
-        }
-
-        _=> {}
-    }
-}
-...
-```
-Note that the value received from the `ValueChanged()` variant is a normalized value, which is why we needed to convert the frequency in the `run()` function with the following code:
-
-```rs
-frequency = (val * (2000.0 - 440.0)) + 440.0;
+cx.add_theme(THEME);
 ```
 
 And that's it! If we run our app now and press the Z key to play the tone we can now change the amplitude and frequency of the tone using the two knobs, even while the tone is playing. Note that we don't have any smoothing in place so sudden changes in amplitude or frequency may cause a crackling sound.
+
 
 
