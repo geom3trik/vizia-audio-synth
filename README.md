@@ -1,4 +1,4 @@
-![alt text](https://github.com/geom3trik/tuix_audio_synth/blob/main/screenshot.png?raw=true)
+![Image of the finished audio synth](https://github.com/geom3trik/vizia-audio-synth/blob/main/screenshot.png?raw=true)
 
 In this tutorial we'll create a very simple audio synthesizer application from scratch with a GUI using [Vizia](https://github.com/vizia/vizia).
 
