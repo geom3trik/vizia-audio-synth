@@ -23,7 +23,7 @@ crossbeam-channel = "0.5.5"
 
 We'll be using cpal for the audio generation and crossbeam-channel for communicating between our main thread and the audio thread which CPAL creates for us.
 
-# Step 2 - Create a simple tuix application
+# Step 2 - Create a simple vizia application
 
 To start with we'll just create an empty window application using vizia with the following code in our `main.rs` file: 
 
@@ -34,12 +34,11 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 fn main() {
 
     Application::new(|cx|{
-
+        // UI will go here
     })
+    .title("Audio Synth")
     .inner_size((200, 120))
     .run();
-
-    app.run();
 }
 ```
 
@@ -182,9 +181,9 @@ impl AppData {
 ```
 
 
-The `AppData` contains a crossbeam_channel which we'll use to send messages to the audio thread. Note also the `#[derive(Lens)]`. This is used by Vizia to bind views to pieces of data from our model.
+The `AppData` contains a crossbeam_channel sender which we'll use to send messages to the audio thread. Note also the `#[derive(Lens)]`. This is used by Vizia to bind views to pieces of data from our model.
 
-Next we'll implement the `Model` trait for the `AppData`. This trait provides an `event` method which we can use to update the model data in response to messages sent from the UI. We'll also need a enum which represents these UI events. Add the following above the main function:
+Next we'll implement the `Model` trait for the `AppData`. This trait provides an `event` function which we can use to update the model data in response to events sent from views in our UI. For this we'll also need an enum which represents these UI events. Add the following above the main function:
 
 ```rust
 pub enum AppEvent {
@@ -238,11 +237,11 @@ Application::new(move |cx|{
 
 ```
 
-If we run our app again now with `cargo run` nothing will have changed. This is because although we are sending messages, our audio thread isn't set up to receive them yet.
+If we run our app again now with `cargo run` nothing will have changed. This is because although we are sending messages when the `Z` key is pressed, our audio thread isn't set up to receive them yet.
 
 # Step 5 - Reacting to messages
 
-Now that messages are being sent by our `Controller`, we need to modify the code in our `run` function to receive these events and change our oscillator note value. Modify the `run` function to look like the following:
+Now that messages are being sent by our model, we need to modify the code in our `run` function to receive these events and change our oscillator note value. Modify the `run` function to look like the following:
 
 ```Rust
 fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig, command_receiver: crossbeam_channel::Receiver<Message>) -> Result<(), anyhow::Error>
@@ -316,7 +315,13 @@ where
 }
 ```
 
-The run function now takes an additional crossbeam_channel parameter, and notice that we've also now multiplied the sine function inside of the make_noise closure by the note value. Make sure to pass the `command_receiver` to the run function call inside our main, like so:
+Note that the value received from the `Frequency` message is a normalized value, which is why we need to convert the frequency in the `run()` function with the following code:
+
+```rs
+frequency = (val * (2000.0 - 440.0)) + 440.0;
+```
+
+The run function now takes an additional crossbeam_channel receiver parameter, and notice that we've also now multiplied the sine function inside of the `make_noise` closure by the note value. Make sure to pass the `command_receiver` to the run function call inside our main function like so:
 
 ```Rust
 ...
@@ -373,7 +378,7 @@ Application::new(move |cx|{
 .run();
 
 ```
-Let's break this down. The `HStack` is a container view which arranges its children into a row. To add children to the `HStack`, simply declare them inside the closure. The `Knob` view takes three parameters after `cx`, an initial normalized value, a lens to the model data, and a boolean which determines whether the knob starts from the beginning or the center.
+Let's break this down. The `HStack` is a container view which arranges its children into a row. To add children to the `HStack`, we simply declare them inside the closure. The `Knob` view takes three parameters after `cx`, an initial normalized value, a lens to the model data, and a boolean which determines whether the knob starts from the beginning or the center.
 
 The `#[derive(Lens)]` on our `AppData` allows us to pass a lens to a piece of our model with the convenient syntax `AppData::amplitude`. Now, if another view or event were to change the value of `amplitude` in our `AppData`, the knob would update to show the changed value.
 
@@ -412,19 +417,7 @@ And add this line inside the `Application::new()` closure, before the call to `A
 cx.add_theme(THEME);
 ```
 
-Running the app now should show a a pair of knobs, one for amplitude and the other for frequency.
+And that's it! If we run our app now and press the Z key to play the tone we can now change the amplitude and frequency of the tone using the two knobs, even while the tone is playing. Note that we don't have any smoothing in place so sudden changes in amplitude or frequency may cause a crackling sound.
 
-# Step 7 - Connecting the control knobs
-
-<!-- Now that we have some knob widgets for amplitude and frequency, we need to send some messages to the audio thread when the values of the knobs change. When a knob is used a `SliderEvent::ValueChanged` event is sent up the hierarchy from the knob to the root (window). We can intercept this event in our `Controller` widget by adding the following code to the `on_event` function in the `Widget` implementation. 
-
-
-Note that the value received from the `ValueChanged()` variant is a normalized value, which is why we needed to convert the frequency in the `run()` function with the following code:
-
-```rs
-frequency = (val * (2000.0 - 440.0)) + 440.0;
-```
-
-And that's it! If we run our app now and press the Z key to play the tone we can now change the amplitude and frequency of the tone using the two knobs, even while the tone is playing. Note that we don't have any smoothing in place so sudden changes in amplitude or frequency may cause a crackling sound. -->
 
 

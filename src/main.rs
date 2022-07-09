@@ -117,6 +117,7 @@ fn main() {
         })
         .class("content");
     })
+    .title("Audio Synth")
     .inner_size((200, 120))
     .run();
 }
