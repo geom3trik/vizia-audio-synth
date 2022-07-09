@@ -239,7 +239,7 @@ Application::new(move |cx|{
 
 If we run our app again now with `cargo run` nothing will have changed. This is because although we are sending messages when the `Z` key is pressed, our audio thread isn't set up to receive them yet.
 
-# Step 5 - Reacting to messages
+# Step 6 - Reacting to messages
 
 Now that messages are being sent by our model, we need to modify the code in our `run` function to receive these events and change our oscillator note value. Modify the `run` function to look like the following:
 
@@ -354,7 +354,7 @@ thread::spawn(move || {
 
 If we run this now the tone should play when we hit the Z key.
 
-# Step 6 - Adding control knobs
+# Step 7 - Adding control knobs
 
 Time to add some controls for the amplitude and frequency of our simple oscillator. Inside the application closure, add the following code:
 
