@@ -42,6 +42,8 @@ fn main() {
 }
 ```
 
+The `Application` constructor creates a `Context` which is provided by the closure. This context will be passed to models and views to build them into the UI tree.
+
 To save some time the things we'll need from vizia and cpal have also been included at the top of the file.
 
 # Step 3 - Generating some sound
@@ -322,6 +324,8 @@ Note that the value received from the `Frequency` message is a normalized value,
 frequency = (val * (2000.0 - 440.0)) + 440.0;
 ```
 
+This remaps the normalized frequency in the range 0.0 to 1.0, to a frequency in Hz in the range 440.0 to 2000.0.
+
 The run function now takes an additional crossbeam_channel receiver parameter, and notice that we've also now multiplied the sine function inside of the `make_noise` closure by the note value. Make sure to pass the `command_receiver` to the run function call inside our main function like so:
 
 ```Rust
@@ -407,7 +411,11 @@ knob .track {
 }
 ```
 
-Then add this line somewhere at the top of the main.rs file:
+Note that we gave the `HStack` a class name of 'content' using the `class()` modifier. This allows us to style the `HStack` based on its class name.
+
+Some of the CSS properties are standard, however vizia uses a custom system for layout. The `child-space` property defines the space around the children of a view. The `col-between` property applies to children in a row layout and defines the space between the children. In this case both values are set to `1s`, which is equivalent to `Stretch(1.0)`. This is will cause the spacing to fill the available space, resulting in the knobs being centered in the `HStack` with an equal amount of space between and around them.  
+
+Then, add this line somewhere at the top of the main.rs file:
 
 ```Rust
 static THEME: &'static str = include_str!("theme.css");
@@ -420,3 +428,53 @@ cx.add_theme(THEME);
 ```
 
 And that's it! If we run our app now and press the Z key to play the tone we can now change the amplitude and frequency of the tone using the two knobs, even while the tone is playing. Note that we don't have any smoothing in place so sudden changes in amplitude or frequency may cause a crackling sound.
+
+# Step 8 - Adding labels
+
+To make it clear what values our amplitude and frequency knobs are set to, let's add some labels below them. Update the code within the `HStack` to the following:
+
+```rust
+HStack::new(cx, |cx|{
+    VStack::new(cx, |cx|{
+        Knob::new(cx, 0.5, AppData::amplitude, false)
+            .on_changing(|cx, val| cx.emit(AppEvent::SetAmplitude(val)));
+        Label::new(cx, AppData::amplitude.map(|amp| format!("{:.2}", amp)));
+    })
+    .class("control");
+
+    VStack::new(cx, |cx|{
+        Knob::new(cx, 0.0, AppData::frequency, false)
+            .on_changing(|cx, val| cx.emit(AppEvent::SetFrequency(val)));
+        Label::new(cx, AppData::frequency.map(|freq| format!("{:.0} Hz", 440.0 + *freq * (2000.0 - 440.0))));
+    })
+    .class("control");
+})
+.class("content");
+```
+We've wrapped each knob inside a `VStack`, which arranges its children into a column, and then added labels for one. 
+
+We could pass the lenses for `amplitude` and `frequency` directly to our labels and they would be converted to strings to display. However, in order to control the formatting of the values, we use the `map()` function on lenses to convert the value to a string with custom formatting provided by the `format!` macro.
+
+Note also that the target value for frequency is normalized so we convert the value to Hz for display.
+
+Finally, add the following to the stylesheet so that our labels and knobs are positioned correctly:
+
+```css
+.control {
+    width: auto;
+    height: auto;
+    child-space: 1s;
+    row-between: 8px;
+}
+
+label {
+    color: white;
+    width: 100px;
+    height: 24px;
+    child-space: 1s;
+}
+```
+
+We use `child-space: 1s` again to center the knob and label within the `VStack`, and specify 8px of vertical space between them. An `auto` unit for width and height results in a `VStack` which 'hugs' its children. For the label we specify width and height in pixels and use `child-space: 1s` again to center the text within the labels.
+
+If we run the application now we get the final result shown at the top of this tutorial. The complete code can be found [here](https://github.com/geom3trik/vizia-audio-synth/blob/main/src/main.rs).
