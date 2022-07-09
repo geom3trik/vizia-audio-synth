@@ -232,6 +232,7 @@ To use this model we'll need to add it to our application and build it. Change t
 Application::new(move |cx|{
     AppData::new(command_sender.clone()).build(cx);
 })
+.title("Audio Synth")
 .inner_size((200, 120))
 .run();
 
@@ -374,6 +375,7 @@ Application::new(move |cx|{
     })
     .class("content");
 })
+.title("Audio Synth")
 .inner_size((200, 120))
 .run();
 
@@ -411,13 +413,10 @@ Then add this line somewhere at the top of the main.rs file:
 static THEME: &'static str = include_str!("theme.css");
 ```
 
-And add this line inside the `Application::new()` closure, before the call to `AppData::new()`:
+And then add this line inside the `Application::new()` closure, before the call to `AppData::new()`:
 
 ```Rust
 cx.add_theme(THEME);
 ```
 
 And that's it! If we run our app now and press the Z key to play the tone we can now change the amplitude and frequency of the tone using the two knobs, even while the tone is playing. Note that we don't have any smoothing in place so sudden changes in amplitude or frequency may cause a crackling sound.
-
-
-
