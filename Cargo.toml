@@ -7,5 +7,5 @@ edition = "2021"
 [dependencies]
 cpal = "0.13.5"
 anyhow = "1.0.60"
-vizia = {git = "https://github.com/vizia/vizia"}
+vizia = {git = "https://github.com/vizia/vizia", rev = "902c821e4dbde2876558c186185dcc60bbb94e16"}
 crossbeam-channel = "0.5.5"
