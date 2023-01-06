@@ -61,7 +61,7 @@ impl AppData {
         Self {
             command_sender,
 
-            amplitude: 0.5,
+            amplitude: 0.1,
             frequency: 0.0,
         }
     }
@@ -144,7 +144,7 @@ where
     // Define some variables we need for a simple oscillator
     let mut phi = 0.0f32;
     let mut frequency = 440.0f32;
-    let mut amplitude = 1.0;
+    let mut amplitude = 0.1;
     let mut note = 0.0;
 
     // Build an output stream

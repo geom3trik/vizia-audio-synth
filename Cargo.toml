@@ -1,11 +1,11 @@
 [package]
-name = "vizia_synth_demo"
+name = "vizia_audio_synth"
 version = "0.1.0"
-authors = ["George Atkinson <geomyles@yahoo.co.uk>"]
+authors = ["George Atkinson <geom3trik@vizia.dev>"]
 edition = "2021"
 
 [dependencies]
 cpal = "0.13.5"
 anyhow = "1.0.60"
-vizia = {git = "https://github.com/vizia/vizia", rev = "f3425d343f9c71de19ecd37de6cb245473d94c07"}
+vizia = {git = "https://github.com/vizia/vizia", rev = "6dfa0b84d181b8a98c0af7001112e50655cd8218"}
 crossbeam-channel = "0.5.5"
