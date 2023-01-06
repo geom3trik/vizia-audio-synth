@@ -5,7 +5,7 @@ authors = ["George Atkinson <geom3trik@vizia.dev>"]
 edition = "2021"
 
 [dependencies]
-cpal = "0.13.5"
+cpal = "0.14.2"
 anyhow = "1.0.60"
 vizia = {git = "https://github.com/vizia/vizia", rev = "6dfa0b84d181b8a98c0af7001112e50655cd8218"}
 crossbeam-channel = "0.5.5"
